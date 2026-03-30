@@ -2,85 +2,98 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_ERRORS 2000
-#define MAX_ERRLEN 256
+int line_no = 1;
 
-static int line_no = 1;
-static int err_count = 0;
-static char errors[MAX_ERRORS][MAX_ERRLEN];
+/* Symbol Table */
+char symtab[100][50];
+int symcount = 0;
 
-static void add_error(int line, const char *lexeme) {
-    if (err_count < MAX_ERRORS) {
-        snprintf(errors[err_count], MAX_ERRLEN, "Line %d : %s invalid lexeme", line, lexeme);
-        err_count++;
-    }
-}
-
-static int is_keyword(const char *s) {
-    static const char *kw[] = {
-        "auto","break","case","char","const","continue","default","do","double","else","enum",
-        "extern","float","for","goto","if","int","long","register","return","short","signed",
-        "sizeof","static","struct","switch","typedef","union","unsigned","void","volatile","while"
-    };
-    for (size_t i = 0; i < sizeof(kw)/sizeof(kw[0]); i++) {
-        if (strcmp(s, kw[i]) == 0) return 1;
+/* Search identifier in symbol table */
+int search(char *id)
+{
+    int i;
+    for(i = 0; i < symcount; i++)
+    {
+        if(strcmp(symtab[i], id) == 0)
+            return 1;
     }
     return 0;
+}
+
+/* Insert identifier into symbol table */
+void insert(char *id)
+{
+    if(!search(id))
+    {
+        strcpy(symtab[symcount], id);
+        symcount++;
+    }
 }
 %}
 
-%x CCOMMENT
-
-DIGIT      [0-9]
-LETTER     [A-Za-z_]
-ID         {LETTER}({LETTER}|{DIGIT})*
-INTCONST   {DIGIT}+
-FCONST     ({DIGIT}+"."{DIGIT}*)|("."{DIGIT}+)
-EXP        [eE][+-]?{DIGIT}+
-NUMCONST   ({FCONST}({EXP})?)|({INTCONST}({EXP})?)
-WS         [ \t\r]+
-CHARCONST  \'(\\.|[^\\\'\n])\'
-STRCONST   \"(\\.|[^\\\"\n])*\"
+/* Token definitions */
+KEYWORD     int|char|float|double|long|short|void|return|struct
+ID          [a-zA-Z_][a-zA-Z0-9_]*
+NUMBER      [0-9]+(\.[0-9]+)?
+CHARCONST   \'[^\']\'
+STRING      \"([^\\\"]|\\.)*\"
+OPERATOR    \+|\-|\*|\/|=|==|<=|>=|<|>
+PUNCT       [\(\)\{\}\[\];,]
+INVALID     [0-9]+[a-zA-Z]+
 
 %%
 
-{WS}                                 { }
-\n                                   { line_no++; }
+"//".*                                  ;   /* remove single-line comments */
+"/*"([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*"*"+"/"   ;   /* remove multi-line comments */
 
-"//"[^\n]*                           { }
+{KEYWORD}      { printf("Keyword: %s\n", yytext); }
+{ID}           { printf("Identifier: %s\n", yytext); insert(yytext); }
+{NUMBER}       { printf("Constant: %s\n", yytext); }
+{CHARCONST}    { printf("Constant: %s\n", yytext); }
+{STRING}       { printf("String: %s\n", yytext); }
+{OPERATOR}     { printf("Operator: %s\n", yytext); }
+{PUNCT}        { printf("Punctuation: %s\n", yytext); }
 
-"/*"                                 { BEGIN(CCOMMENT); }
-<CCOMMENT>"*/"                       { BEGIN(INITIAL); }
-<CCOMMENT>\n                         { line_no++; }
-<CCOMMENT>.                          { }
+{INVALID}      { printf("LEXICAL ERROR at line %d : %s invalid lexeme\n", line_no, yytext); }
 
-{DIGIT}+{LETTER}({LETTER}|{DIGIT})*   { add_error(line_no, yytext); }
+\n             { line_no++; }
+[ \t]+         ;   /* ignore whitespaces */
+.              ;
 
-{STRCONST}                            { printf("String: %s\n", yytext); }
-{CHARCONST}                           { printf("Constant: %s\n", yytext); }
-{NUMCONST}                            { printf("Constant: %s\n", yytext); }
+%%x
 
-{ID}                                  { if (is_keyword(yytext)) printf("Keyword: %s\n", yytext); else printf("Identifier: %s\n", yytext); }
+int main(int argc, char *argv[])
+{
+    FILE *fp;
+    int i;
 
-"++"|"--"|"+="|"-="|"*="|"/="|"%="|"=="|"!="|"<="|">="|"&&"|"||"|"<<"|">>"|"->"   { printf("Operator: %s\n", yytext); }
+    if(argc != 2)
+    {
+        printf("Usage: ./a.out input.c\n");
+        return 0;
+    }
 
-"+"|"-"|"*"|"/"|"%"|"="|"<"|">"|"!"|"&"|"|"|"^"|"~"|"?"|":"|"."                   { printf("Operator: %s\n", yytext); }
+    fp = fopen(argv[1], "r");
+    if(!fp)
+    {
+        printf("Cannot open file\n");
+        return 0;
+    }
 
-";"|","|"("|")"|"{"|"}"|"["|"]"                                                  { printf("Punctuation: %s\n", yytext); }
+    yyin = fp;
 
-.                                    { add_error(line_no, yytext); }
-
-%%
-
-int yywrap(void) { return 1; }
-
-int main(void) {
-    printf("TOKENS\n");
+    printf("\nTOKENS\n\n");
     yylex();
 
-    printf("LEXICAL ERRORS\n");
-    if (err_count == 0) printf("None\n");
-    else for (int i = 0; i < err_count; i++) printf("%s\n", errors[i]);
+    printf("\nSYMBOL TABLE ENTRIES\n");
+    for(i = 0; i < symcount; i++)
+        printf("%d) %s\n", i+1, symtab[i]);
 
+    fclose(fp);
     return 0;
+}
+
+int yywrap()
+{
+    return 1;
 }

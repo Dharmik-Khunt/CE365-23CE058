@@ -1,90 +1,76 @@
-#include <iostream>
-#include <string>
-using namespace std;
+#include <stdio.h>
+#include <string.h>
 
-class RecursiveDescentParser {
-private:
-    string input;
-    int index;
+int i = 0;
+char input[100];
 
-    char currentChar() {
-        if (index < input.length())
-            return input[index];
-        return '\0';
+/* Function declarations */
+int S();
+int L();
+int Ldash();
+
+/* Match terminal symbol */
+int match(char expected)
+{
+    if(input[i] == expected)
+    {
+        i++;
+        return 1;
     }
-    
-    bool match(char expected) {
-        if (currentChar() == expected) {
-            index++;
-            return true;
+    return 0;
+}
+
+/* S → ( L ) | a */
+int S()
+{
+    if(input[i] == 'a')
+    {
+        i++;
+        return 1;
+    }
+    else if(input[i] == '(')
+    {
+        i++;
+        if(L())
+        {
+            if(match(')'))
+                return 1;
         }
-        return false;
+        return 0;
     }
+    return 0;
+}
 
-    // S → ( L ) | a
-    bool S() {
-        if (match('a')) {
-            return true;
-        }
-        else if (match('(')) {
-            if (L()) {
-                if (match(')'))
-                    return true;
-            }
-            return false;
-        }
-        return false;
+/* L → S L' */
+int L()
+{
+    if(S())
+        return Ldash();
+    return 0;
+}
+
+/* L' → , S L' | ε */
+int Ldash()
+{
+    if(input[i] == ',')
+    {
+        i++;
+        if(S())
+            return Ldash();
+        return 0;
     }
+    return 1;   /* ε (empty string) */
+}
 
-    // L → S L'
-    bool L() {
-        if (S()) {
-            return LPrime();
-        }
-        return false;
-    }
+int main()
+{
+    printf("Enter the string: ");
+    scanf("%s", input);
 
-    // L' → , S L' | ε
-    bool LPrime() {
-        if (match(',')) {
-            if (S()) {
-                return LPrime();
-            }
-            return false;
-        }
-        // epsilon production
-        return true;
-    }
-
-public:
-    RecursiveDescentParser(string str) {
-        // Remove spaces from input
-        for (char c : str) {
-            if (c != ' ')
-                input += c;
-        }
-        index = 0;
-    }
-
-    bool parse() {
-        if (S() && index == input.length())
-            return true;
-        return false;
-    }
-};
-
-int main() {
-    string str;
-
-    cout << "Enter string: ";
-    getline(cin, str);
-
-    RecursiveDescentParser parser(str);
-
-    if (parser.parse())
-        cout << "Valid string" << endl;
+    if(S() && input[i] == '\0')
+        printf("Valid string\n");
     else
-        cout << "Invalid string" << endl;
+        printf("Invalid string\n");
 
     return 0;
 }
